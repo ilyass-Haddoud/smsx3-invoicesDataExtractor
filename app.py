@@ -48,12 +48,13 @@ def extract_invoice_fields(invoice_image):
 
 @app.route('/extract_fields', methods=['POST'])
 def extract_fields():
+    print(request.files)
     # Check if image file is present in the request
-    if 'invoice_image' not in request.files:
+    if 'document' not in request.files:
         return jsonify({'error': 'No image file provided'}), 400
 
     # Get the image file from the request
-    invoice_image = Image.open(request.files['invoice_image'])
+    invoice_image = Image.open(request.files['document'])
 
     # Extract fields using Gemini API
     extracted_fields = extract_invoice_fields(invoice_image)
