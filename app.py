@@ -11,35 +11,29 @@ CORS(app)
 # Configure Gemini API
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Static input prompt
 input_prompt = """
                You are an expert in understanding invoices.
                You will receive input images as invoices &
-               you will have to extract these fields (site_vente,type,numero_facture,reference,date,client_facture,client_intitule,client_commande,tiers_payeur,client_groupe,etat,devise,debut_echeance,type_paiement,date_debut_periode,date_fin_periode,document) and return it as a json object
-               & if you didnt find a field leave it blank
+               you will have to extract these fields (site_vente,numero_facture,type_facture,numero_piece,date,fournisseur,raison_sociale,devise(EUR,USD,MAD,...),debut_echeance,adresse,condition_paiement,etat_facture,total_ttc(just the number(pos or neg) without the currency)) and return it as a json object
+               & if you didnt find a field leave it blank(empty string)
                """
 
 
-# Function to extract fields from the invoice using Gemini API
 def extract_invoice_fields(invoice_image):
-    # Initialize the GenerativeModel for extracting fields
     model = genai.GenerativeModel('gemini-pro-vision')
 
-    # Generate content using the static input prompt and the image
     response = model.generate_content(["", invoice_image, input_prompt])
 
-    # Parse the response and extract the fields
     fields = response.text.split("\n")
     extracted_fields = {}
     for field in fields:
         if ":" in field:
             key, value = field.split(":")
-            key = key.strip().strip('"')  # Remove leading/trailing whitespace and double quotes
+            key = key.strip().strip('"')
             value = value.strip().strip('"').rstrip(
-                ',')  # Remove leading/trailing whitespace, double quotes, and commas
+                ',')
             extracted_fields[key] = value
 
-    # Remove unwanted characters from field values
     for key, value in extracted_fields.items():
         extracted_fields[key] = value.replace('"', '').strip()
 
@@ -49,17 +43,13 @@ def extract_invoice_fields(invoice_image):
 @app.route('/extract_fields', methods=['POST'])
 def extract_fields():
     print(request.files)
-    # Check if image file is present in the request
     if 'document' not in request.files:
         return jsonify({'error': 'No image file provided'}), 400
 
-    # Get the image file from the request
     invoice_image = Image.open(request.files['document'])
 
-    # Extract fields using Gemini API
     extracted_fields = extract_invoice_fields(invoice_image)
 
-    # Return extracted fields as JSON response
     return jsonify(extracted_fields)
 
 
