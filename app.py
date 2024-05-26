@@ -12,10 +12,34 @@ CORS(app)
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 input_prompt = """
-               You are an expert in understanding invoices.
-               You will receive input images as invoices &
-               you will have to extract these fields (site_vente,numero_facture,type_facture,numero_piece,date,fournisseur,raison_sociale,devise(EUR,USD,MAD,...),debut_echeance,adresse,condition_paiement,etat_facture,total_ttc(just the number(pos or neg) without the currency)) and return it as a json object
-               & if you didnt find a field leave it blank(empty string)
+               Vous êtes chargé d'extraire des informations à partir de factures.
+                Vous recevrez des images en entrée représentant des factures, et vous devez extraire les champs suivants (site, typeFacture, dateComptable, tiers, devise, documentOrigine, dateOrigine, totalHTLignes, totalTaxes, montantTTC). Pour chaque article de la facture, il doit y avoir les champs suivants (article, designation, uniteFacturation, quantiteFacturee, prixNet, montantLigneHT).
+                Le résultat doit être sous format d'un objet JSON. Pour le champ 'items', il doit être un tableau d'objets représentant les articles de la facture, comme indiqué dans l'exemple ci-dessous. Les clés de l'objet doivent rester les mêmes que celles fournies dans l'exemple. Si un champ n'est pas trouvé, il doit être laissé vide (chaîne vide).
+                Pour chaque article, tu inclus un code unique
+                Exemple de réponse :
+                {
+                    "site": "",
+                    "typeFacture": "",
+                    "dateComptable": "",
+                    "tiers": "",
+                    "devise": "",
+                    "documentOrigine": "",
+                    "dateOrigine": "",
+                    "totalHTLignes": ,
+                    "totalTaxes": ,
+                    "montantTTC": ,
+                    "items": [
+                        {
+                            "code": "";
+                            "article": "",
+                            "designation": "",
+                            "uniteFacturation": "",
+                            "quantiteFacturee": ,
+                            "prixNet": ,
+                            "montantLigneHT": ,
+                        }
+                    ]
+                }
                """
 
 
@@ -23,21 +47,18 @@ def extract_invoice_fields(invoice_image):
     model = genai.GenerativeModel('gemini-pro-vision')
 
     response = model.generate_content(["", invoice_image, input_prompt])
+    response_text = response.text
 
-    fields = response.text.split("\n")
-    extracted_fields = {}
-    for field in fields:
-        if ":" in field:
-            key, value = field.split(":")
-            key = key.strip().strip('"')
-            value = value.strip().strip('"').rstrip(
-                ',')
-            extracted_fields[key] = value
+    # Trouver l'indice de début et de fin des balises "```json"
+    start_index = response_text.find("```json") + len("```json")
+    end_index = response_text.rfind("```")
 
-    for key, value in extracted_fields.items():
-        extracted_fields[key] = value.replace('"', '').strip()
+    # Extraire le contenu JSON entre les balises
+    json_content = response_text[start_index:end_index].strip()
 
-    return extracted_fields
+    # Charger le JSON
+    response_json = json.loads(json_content)
+    return response_json
 
 
 @app.route('/extract_fields', methods=['POST'])
